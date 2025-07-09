@@ -1,0 +1,35 @@
+{
+  "name": "BYD Test Drive Tracker",
+  "short_name": "BYD Tracker",
+  "description": "Track BYD vehicle test drives efficiently",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Add New Test Drive",
+      "short_name": "Add New",
+      "description": "Quickly add a new test drive record",
+      "url": "/add",
+      "icons": [{ "src": "/vite.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "View Records",
+      "short_name": "Records",
+      "description": "View all test drive records",
+      "url": "/list",
+      "icons": [{ "src": "/vite.svg", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
