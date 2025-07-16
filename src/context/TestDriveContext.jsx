@@ -136,9 +136,82 @@ export function TestDriveProvider({ children }) {
     }
   };
 
+  // Delete test drive
+  const deleteTestDrive = async (id) => {
+    if (isOnline) {
+      try {
+        const { error } = await supabase.from('test_drives').delete().eq('id', id);
+        if (error) throw error;
+        await fetchTestDrives();
+        return { success: true };
+      } catch (err) {
+        throw new Error(err.message || 'Failed to delete record');
+      }
+    } else {
+      throw new Error('Cannot delete records while offline');
+    }
+  };
+
+  // Delete multiple test drives
+  const deleteMultipleTestDrives = async (ids) => {
+    if (isOnline) {
+      try {
+        const { error } = await supabase.from('test_drives').delete().in('id', ids);
+        if (error) throw error;
+        await fetchTestDrives();
+        return { success: true, count: ids.length };
+      } catch (err) {
+        throw new Error(err.message || 'Failed to delete records');
+      }
+    } else {
+      throw new Error('Cannot delete records while offline');
+    }
+  };
+
+  // Auto delete old records based on settings
+  const autoDeleteOldRecords = async (daysToKeep) => {
+    if (!isOnline || !daysToKeep) return;
+    
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+      
+      const { error } = await supabase
+        .from('test_drives')
+        .delete()
+        .lt('date_time', cutoffDate.toISOString());
+      
+      if (error) throw error;
+      await fetchTestDrives();
+      return { success: true };
+    } catch (err) {
+      console.error('Auto delete failed:', err);
+    }
+  };
+
   useEffect(() => {
     fetchTestDrives();
   }, []);
+
+  // Auto-delete functionality - runs on app startup
+  useEffect(() => {
+    const checkAutoDelete = async () => {
+      const autoDeleteDays = localStorage.getItem('testdrive_autodelete_days');
+      if (autoDeleteDays && isOnline && testDrives.length > 0) {
+        try {
+          await autoDeleteOldRecords(parseInt(autoDeleteDays));
+        } catch (err) {
+          console.warn('Auto-delete failed:', err);
+        }
+      }
+    };
+
+    // Run auto-delete check on startup and when coming online
+    if (isOnline) {
+      setTimeout(checkAutoDelete, 5000); // Delay to ensure data is loaded
+    }
+  }, [isOnline, testDrives.length]);
+
   const value = {
     testDrives,
     loading,
@@ -151,7 +224,10 @@ export function TestDriveProvider({ children }) {
     showSuccess,
     showError,
     showWarning,
-    showInfo
+    showInfo,
+    deleteTestDrive,
+    deleteMultipleTestDrives,
+    autoDeleteOldRecords
   };
 
   return (

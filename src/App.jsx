@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import TestDriveForm from './components/TestDriveForm';
 import CameraCapture from './components/CameraCapture';
 import TestDriveList from './components/TestDriveList';
+import Settings from './components/Settings';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
               <Route path="/add" element={<TestDriveForm />} />
               <Route path="/camera" element={<CameraCapture />} />
               <Route path="/list" element={<TestDriveList />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </Layout>
         </Router>

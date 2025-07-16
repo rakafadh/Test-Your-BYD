@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTestDrive } from '../context/TestDriveContext';
-import { Download, Search, Filter, Calendar, User } from 'lucide-react';
+import { Download, Search, Filter, Calendar, User, Trash2, CheckSquare, Square } from 'lucide-react';
+import DeleteModal from './DeleteModal';
 
 function exportToCSV(data) {
   const replacer = (key, value) => value === null ? '' : value;
@@ -29,11 +30,15 @@ function exportToCSV(data) {
 }
 
 export default function TestDriveList() {
-  const { testDrives, loading, error } = useTestDrive();
+  const { testDrives, loading, error, deleteTestDrive, deleteMultipleTestDrives, showSuccess, showError, isOnline } = useTestDrive();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [date, setDate] = useState('');
   const [employee, setEmployee] = useState('');
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null });
+  const [bulkDeleteModal, setBulkDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const filtered = testDrives.filter(td => {
     return (
@@ -43,18 +48,86 @@ export default function TestDriveList() {
       (!employee || td.employee_name.toLowerCase().includes(employee.toLowerCase()))
     );
   });
+  
+  // Selection handlers
+  const handleSelectItem = (id) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedItems.size === filtered.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(filtered.map(td => td.id)));
+    }
+  };
+
+  // Delete handlers
+  const handleDeleteSingle = async () => {
+    setDeleting(true);
+    try {
+      await deleteTestDrive(deleteModal.item.id);
+      showSuccess('Record deleted successfully');
+      setDeleteModal({ isOpen: false, item: null });
+      setSelectedItems(new Set());
+    } catch (err) {
+      showError('Failed to delete record: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setDeleting(true);
+    try {
+      const result = await deleteMultipleTestDrives(Array.from(selectedItems));
+      showSuccess(`Successfully deleted ${result.count} records`);
+      setBulkDeleteModal(false);
+      setSelectedItems(new Set());
+    } catch (err) {
+      showError('Failed to delete records: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 mt-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Test Drive Records</h2>
-        <button
-          onClick={() => exportToCSV(filtered)}
-          className="btn btn-success flex items-center gap-2"
-          disabled={filtered.length === 0}
-        >
-          <Download className="w-4 h-4" />
-          Export CSV ({filtered.length})
-        </button>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Test Drive Records</h2>
+          {selectedItems.size > 0 && (
+            <div className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+              {selectedItems.size} selected
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {selectedItems.size > 0 && (
+            <button
+              onClick={() => setBulkDeleteModal(true)}
+              className="btn bg-red-600 hover:bg-red-700 text-white text-sm"
+              disabled={!isOnline}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete Selected
+            </button>
+          )}
+          <button
+            onClick={() => exportToCSV(filtered)}
+            className="btn btn-success flex items-center gap-2"
+            disabled={filtered.length === 0}
+          >
+            <Download className="w-4 h-4" />
+            Export CSV ({filtered.length})
+          </button>
+        </div>
       </div>      {/* Filters */}
       <div className="card">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
@@ -160,19 +233,30 @@ export default function TestDriveList() {
           <table className="table">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-gray-50 z-10">Employee</th>
+                <th className="sticky left-0 bg-gray-50 z-10">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.size === filtered.length && filtered.length > 0}
+                      onChange={handleSelectAll}
+                      className="checkbox checkbox-sm"
+                    />
+                    Employee
+                  </div>
+                </th>
                 <th>Date & Time</th>
                 <th>Status</th>
                 <th>Car Model</th>
                 <th>License Plate</th>
                 <th>Odometer</th>
                 <th>Photos</th>
+                <th className="text-right pr-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-8 text-gray-500">
+                  <td colSpan="8" className="text-center py-8 text-gray-500">
                     {testDrives.length === 0 ? 'No test drive records found' : 'No records match your filters'}
                   </td>
                 </tr>
@@ -180,7 +264,15 @@ export default function TestDriveList() {
                 filtered.map((td) => (
                   <tr key={td.id} className="group">
                     <td className="sticky left-0 bg-white group-hover:bg-gray-50 font-medium z-10">
-                      {td.employee_name}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(td.id)}
+                          onChange={() => handleSelectItem(td.id)}
+                          className="checkbox checkbox-sm"
+                        />
+                        {td.employee_name}
+                      </div>
                     </td>
                     <td className="text-gray-600">
                       <div className="text-sm">
@@ -232,6 +324,16 @@ export default function TestDriveList() {
                         <span className="text-gray-400 text-sm">No photos</span>
                       )}
                     </td>
+                    <td className="text-right pr-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setDeleteModal({ isOpen: true, item: td })}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -239,6 +341,26 @@ export default function TestDriveList() {
           </table>
         </div>
       </div>
+
+      {/* Delete Modals */}
+      <DeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, item: null })}
+        onConfirm={handleDeleteSingle}
+        title="Delete Test Drive Record"
+        message="This action cannot be undone."
+        item={deleteModal.item}
+        isLoading={deleting}
+      />
+      
+      <DeleteModal
+        isOpen={bulkDeleteModal}
+        onClose={() => setBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title={`Delete ${selectedItems.size} Records`}
+        message={`Are you sure you want to delete ${selectedItems.size} selected records? This action cannot be undone.`}
+        isLoading={deleting}
+      />
     </div>
   );
 }

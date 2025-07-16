@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Car, Camera, List, Plus, Menu, X, Wifi, WifiOff } from 'lucide-react';
+import { Car, Camera, List, Plus, Menu, X, Wifi, WifiOff, Settings } from 'lucide-react';
 import { useTestDrive } from '../context/TestDriveContext';
 
 export default function Layout({ children }) {
@@ -12,6 +12,7 @@ export default function Layout({ children }) {
     { path: '/', label: 'Dashboard', icon: Car },
     { path: '/add', label: 'Add New', icon: Plus },
     { path: '/list', label: 'List', icon: List },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   return (

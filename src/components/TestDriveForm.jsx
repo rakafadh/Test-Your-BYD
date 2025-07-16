@@ -20,7 +20,7 @@ export default function TestDriveForm() {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);  const [photoUrls, setPhotoUrls] = useState([]);
-  const { testDrives, addTestDrive, isOnline, offlineQueue, showSuccess, showError } = useTestDrive();
+  const { testDrives, addTestDrive, fetchTestDrives, isOnline, offlineQueue, showSuccess, showError } = useTestDrive();
   function validate() {
     const errs = {};
     if (!form.employee_name) errs.employee_name = 'Wajib diisi';
@@ -30,19 +30,35 @@ export default function TestDriveForm() {
     if (!form.plate_number) errs.plate_number = 'Wajib diisi';
     if (!form.kilometer || isNaN(form.kilometer)) errs.kilometer = 'Harus angka';
     if (!photoUrls || photoUrls.length === 0) errs.photos = 'Foto kendaraan wajib diambil';
-    // Unique plat validation for OUT
-    if (
-      form.status === 'OUT' &&
-      testDrives.some(
-        td => td.plate_number === form.plate_number && td.status === 'OUT'
-      )
-    ) {
-      errs.plate_number = 'Plat ini sudah OUT dan belum IN.';
+    
+    // Unique plat validation for OUT - check if vehicle is currently OUT
+    if (form.status === 'OUT' && form.plate_number) {
+      // Get all records for this plate, sorted by date (newest first)
+      const plateRecords = testDrives
+        .filter(td => td.plate_number.toLowerCase() === form.plate_number.toLowerCase())
+        .sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
+      
+      // If there are records, check the latest one
+      if (plateRecords.length > 0) {
+        const latestRecord = plateRecords[0];
+        // If latest record is OUT, then vehicle is still out
+        if (latestRecord.status === 'OUT') {
+          errs.plate_number = 'Plat ini sudah OUT dan belum IN.';
+        }
+      }
     }
     return errs;
   }
   async function handleSubmit(e) {
     e.preventDefault();
+    
+    // Refresh data before validation to ensure we have latest records
+    try {
+      await fetchTestDrives();
+    } catch (err) {
+      console.warn('Could not refresh data before validation:', err);
+    }
+    
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -75,7 +91,44 @@ export default function TestDriveForm() {
   }
 
   function handleChange(e) {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: value }));
+    
+    // Real-time validation for plate number when status is OUT
+    if (name === 'plate_number' || name === 'status') {
+      const updatedForm = { ...form, [name]: value };
+      
+      if (updatedForm.status === 'OUT' && updatedForm.plate_number) {
+        const plateRecords = testDrives
+          .filter(td => td.plate_number.toLowerCase() === updatedForm.plate_number.toLowerCase())
+          .sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
+        
+        if (plateRecords.length > 0) {
+          const latestRecord = plateRecords[0];
+          if (latestRecord.status === 'OUT') {
+            setErrors(prev => ({ 
+              ...prev, 
+              plate_number: 'Plat ini sudah OUT dan belum IN.' 
+            }));
+          } else {
+            setErrors(prev => ({ 
+              ...prev, 
+              plate_number: null 
+            }));
+          }
+        } else {
+          setErrors(prev => ({ 
+            ...prev, 
+            plate_number: null 
+          }));
+        }
+      } else {
+        setErrors(prev => ({ 
+          ...prev, 
+          plate_number: null 
+        }));
+      }
+    }
   }
   function handlePhotosCaptured(urls) {
     setPhotoUrls(urls);

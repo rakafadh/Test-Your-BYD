@@ -7,6 +7,7 @@ export default function CameraCapture({ onPhotosCaptured }) {
   const [photos, setPhotos] = useState([]);
   const [zoom, setZoom] = useState(1);
   const [uploading, setUploading] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState(null);
 
   const videoConstraints = {
@@ -15,8 +16,57 @@ export default function CameraCapture({ onPhotosCaptured }) {
   };
 
   function capture() {
+    if (capturing) return; // Prevent multiple captures while processing
+    
+    setCapturing(true);
     const imageSrc = webcamRef.current.getScreenshot();
-    setPhotos([...photos, imageSrc]);
+    
+    // If zoom is applied, we need to crop the image to match the zoomed view
+    if (zoom > 1) {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Calculate crop dimensions based on zoom
+          const cropWidth = img.width / zoom;
+          const cropHeight = img.height / zoom;
+          const cropX = (img.width - cropWidth) / 2;
+          const cropY = (img.height - cropHeight) / 2;
+          
+          // Set canvas to original size
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          // Draw the cropped and scaled image
+          ctx.drawImage(
+            img,
+            cropX, cropY, cropWidth, cropHeight,  // Source crop area
+            0, 0, canvas.width, canvas.height     // Destination full canvas
+          );
+          
+          const zoomedImageSrc = canvas.toDataURL('image/jpeg', 0.8);
+          setPhotos(prev => [...prev, zoomedImageSrc]);
+        } catch (err) {
+          console.error('Error processing zoomed image:', err);
+          // Fallback to original image if zoom processing fails
+          setPhotos(prev => [...prev, imageSrc]);
+        } finally {
+          setCapturing(false);
+        }
+      };
+      img.onerror = () => {
+        console.error('Error loading image for zoom processing');
+        setPhotos(prev => [...prev, imageSrc]);
+        setCapturing(false);
+      };
+      img.src = imageSrc;
+    } else {
+      // No zoom, use original image
+      setPhotos(prev => [...prev, imageSrc]);
+      setCapturing(false);
+    }
   }
 
   async function handleUpload() {
@@ -41,21 +91,30 @@ export default function CameraCapture({ onPhotosCaptured }) {
   }
   return (
     <div className="flex flex-col items-center space-y-4">
+      {/* Instructions */}
+      <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+        <p>📷 Ambil foto kendaraan dari berbagai sudut</p>
+        <p className="text-xs mt-1">💡 Gunakan zoom untuk fokus pada detail tertentu</p>
+      </div>
+
       {/* Camera Preview */}
-      <div className="relative w-full max-w-md bg-black rounded-lg overflow-hidden">
+      <div className="relative w-full max-w-md bg-black rounded-lg overflow-hidden shadow-lg">
         <Webcam
           ref={webcamRef}
           audio={false}
           screenshotFormat="image/jpeg"
           videoConstraints={videoConstraints}
-          style={{ transform: `scale(${zoom})` }}
+          style={{ 
+            transform: `scale(${zoom})`,
+            transformOrigin: 'center center'
+          }}
           className="w-full h-auto object-cover"
         />
         
         {/* Zoom Control */}
         <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex items-center gap-2 bg-black bg-opacity-50 rounded-lg p-2">
-            <span className="text-white text-xs">Zoom</span>
+          <div className="flex items-center gap-2 bg-black bg-opacity-70 rounded-lg p-3">
+            <span className="text-white text-xs font-medium">🔍</span>
             <input
               type="range"
               min="1"
@@ -63,22 +122,40 @@ export default function CameraCapture({ onPhotosCaptured }) {
               step="0.1"
               value={zoom}
               onChange={e => setZoom(Number(e.target.value))}
-              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="flex-1 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer slider"
             />
-            <span className="text-white text-xs">{zoom.toFixed(1)}x</span>
+            <span className="text-white text-xs font-medium min-w-[35px]">{zoom.toFixed(1)}x</span>
           </div>
+          {zoom > 1 && (
+            <div className="text-center mt-2">
+              <span className="text-white text-xs bg-blue-500 bg-opacity-80 px-2 py-1 rounded">
+                Foto akan disimpan sesuai zoom
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Camera Controls */}
       <div className="flex flex-wrap gap-3 justify-center">
-        <button onClick={capture} className="btn btn-primary">
-          📷 Take Photo
+        <button 
+          onClick={capture} 
+          className="btn btn-primary"
+          disabled={capturing}
+        >
+          {capturing ? (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Processing...
+            </div>
+          ) : (
+            '📷 Take Photo'
+          )}
         </button>
         <button 
           onClick={() => setPhotos([])} 
           className="btn btn-secondary"
-          disabled={photos.length === 0}
+          disabled={photos.length === 0 || capturing}
         >
           🔄 Reset
         </button>
