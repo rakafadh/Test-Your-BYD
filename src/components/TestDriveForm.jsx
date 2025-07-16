@@ -4,60 +4,59 @@ import CameraCapture from './CameraCapture';
 import { supabase } from '../utils/supabase';
 
 const initialState = {
+  customer_name: '',
   employee_name: '',
   date_time: '',
   status: '',
+  police_number: '',
   car_model: '',
-  plate_number: '',
-  kilometer: '',
-  fuel_condition: '',
   notes: '',
-  photos: [],
+  front_photo: '',
+  back_photo: '',
+  left_photo: '',
+  right_photo: '',
+  mid_photo: '',
+  form_photo: ''
 };
 
 export default function TestDriveForm() {
-  const [form, setForm] = useState(initialState);
+  // Get current datetime in local timezone for default value
+  const getCurrentLocalDateTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  };
+
+  const [form, setForm] = useState({
+    ...initialState,
+    date_time: getCurrentLocalDateTime()
+  });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);  const [photoUrls, setPhotoUrls] = useState([]);
+  const [showCamera, setShowCamera] = useState(false);
+  const [currentPhotoType, setCurrentPhotoType] = useState('');
   const { testDrives, addTestDrive, fetchTestDrives, isOnline, offlineQueue, showSuccess, showError } = useTestDrive();
   function validate() {
     const errs = {};
+    if (!form.customer_name) errs.customer_name = 'Wajib diisi';
     if (!form.employee_name) errs.employee_name = 'Wajib diisi';
     if (!form.date_time) errs.date_time = 'Wajib diisi';
     if (!form.status) errs.status = 'Wajib diisi';
+    if (!form.police_number) errs.police_number = 'Wajib diisi';
     if (!form.car_model) errs.car_model = 'Wajib diisi';
-    if (!form.plate_number) errs.plate_number = 'Wajib diisi';
-    if (!form.kilometer || isNaN(form.kilometer)) errs.kilometer = 'Harus angka';
-    if (!photoUrls || photoUrls.length === 0) errs.photos = 'Foto kendaraan wajib diambil';
     
-    // Unique plat validation for OUT - check if vehicle is currently OUT
-    if (form.status === 'OUT' && form.plate_number) {
-      // Get all records for this plate, sorted by date (newest first)
-      const plateRecords = testDrives
-        .filter(td => td.plate_number.toLowerCase() === form.plate_number.toLowerCase())
-        .sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
-      
-      // If there are records, check the latest one
-      if (plateRecords.length > 0) {
-        const latestRecord = plateRecords[0];
-        // If latest record is OUT, then vehicle is still out
-        if (latestRecord.status === 'OUT') {
-          errs.plate_number = 'Plat ini sudah OUT dan belum IN.';
-        }
-      }
-    }
+    // Validate required photos
+    if (!form.front_photo) errs.front_photo = 'Foto depan wajib diambil';
+    if (!form.back_photo) errs.back_photo = 'Foto belakang wajib diambil';
+    if (!form.left_photo) errs.left_photo = 'Foto kiri wajib diambil';
+    if (!form.right_photo) errs.right_photo = 'Foto kanan wajib diambil';
+    if (!form.mid_photo) errs.mid_photo = 'Foto tengah wajib diambil';
+    if (!form.form_photo) errs.form_photo = 'Foto form test drive wajib diambil';
+    
     return errs;
   }
   async function handleSubmit(e) {
     e.preventDefault();
-    
-    // Refresh data before validation to ensure we have latest records
-    try {
-      await fetchTestDrives();
-    } catch (err) {
-      console.warn('Could not refresh data before validation:', err);
-    }
     
     const errs = validate();
     setErrors(errs);
@@ -65,14 +64,15 @@ export default function TestDriveForm() {
     
     setSubmitting(true);
     try {
+      // Convert datetime-local to ISO string with local timezone
+      const localDateTime = new Date(form.date_time);
       const payload = { 
-        ...form, 
-        kilometer: Number(form.kilometer), 
-        photos: photoUrls 
+        ...form,
+        date_time: localDateTime.toISOString()
       };
       
       const result = await addTestDrive(payload);
-        if (result.success) {
+      if (result.success) {
         if (result.offline) {
           showSuccess('Data saved offline and will sync when online.');
         } else {
@@ -80,8 +80,10 @@ export default function TestDriveForm() {
         }
         
         // Reset form
-        setForm(initialState);
-        setPhotoUrls([]);
+        setForm({
+          ...initialState,
+          date_time: getCurrentLocalDateTime()
+        });
       }
     } catch (err) {
       showError('Failed to save: ' + err.message);
@@ -93,60 +95,48 @@ export default function TestDriveForm() {
   function handleChange(e) {
     const { name, value } = e.target;
     setForm(f => ({ ...f, [name]: value }));
-    
-    // Real-time validation for plate number when status is OUT
-    if (name === 'plate_number' || name === 'status') {
-      const updatedForm = { ...form, [name]: value };
-      
-      if (updatedForm.status === 'OUT' && updatedForm.plate_number) {
-        const plateRecords = testDrives
-          .filter(td => td.plate_number.toLowerCase() === updatedForm.plate_number.toLowerCase())
-          .sort((a, b) => new Date(b.date_time) - new Date(a.date_time));
-        
-        if (plateRecords.length > 0) {
-          const latestRecord = plateRecords[0];
-          if (latestRecord.status === 'OUT') {
-            setErrors(prev => ({ 
-              ...prev, 
-              plate_number: 'Plat ini sudah OUT dan belum IN.' 
-            }));
-          } else {
-            setErrors(prev => ({ 
-              ...prev, 
-              plate_number: null 
-            }));
-          }
-        } else {
-          setErrors(prev => ({ 
-            ...prev, 
-            plate_number: null 
-          }));
-        }
-      } else {
-        setErrors(prev => ({ 
-          ...prev, 
-          plate_number: null 
-        }));
-      }
-    }
   }
+
   function handlePhotosCaptured(urls) {
-    setPhotoUrls(urls);
-    setShowCamera(false);
-    // Clear photo error if photos are captured
-    if (urls && urls.length > 0) {
-      setErrors(prev => ({ ...prev, photos: null }));
+    if (urls && urls.length > 0 && currentPhotoType) {
+      setForm(f => ({ ...f, [currentPhotoType]: urls[0] }));
+      setErrors(prev => ({ ...prev, [currentPhotoType]: null }));
     }
+    setShowCamera(false);
+    setCurrentPhotoType('');
+  }
+
+  function openCamera(photoType) {
+    setCurrentPhotoType(photoType);
+    setShowCamera(true);
   }  return (
     <div className="max-w-2xl mx-auto mt-4">
       <div className="card">
         <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900">Test Drive Form</h2>
         <p className="text-sm text-gray-600 mb-6">
-          Fields marked with * are required. Vehicle photos must be taken before submitting.
+          Fields marked with * are required. All vehicle photos must be taken before submitting.
         </p>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Customer Name */}
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Name *
+              </label>
+              <input
+                name="customer_name"
+                value={form.customer_name}
+                onChange={handleChange}
+                className="input"
+                placeholder="Enter customer name"
+              />
+              {errors.customer_name && (
+                <div className="text-red-600 text-sm mt-1">{errors.customer_name}</div>
+              )}
+            </div>
+
+            {/* Employee Name */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Employee Name *
@@ -163,6 +153,7 @@ export default function TestDriveForm() {
               )}
             </div>
 
+            {/* Date & Time */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Date & Time *
@@ -179,11 +170,17 @@ export default function TestDriveForm() {
               )}
             </div>
 
+            {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Status *
               </label>
-              <select name="status" value={form.status} onChange={handleChange} className="input">
+              <select 
+                name="status" 
+                value={form.status} 
+                onChange={handleChange} 
+                className="input"
+              >
                 <option value="">Select Status</option>
                 <option value="OUT">OUT</option>
                 <option value="IN">IN</option>
@@ -193,7 +190,25 @@ export default function TestDriveForm() {
               )}
             </div>
 
+            {/* Police Number */}
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Police Number *
+              </label>
+              <input
+                name="police_number"
+                value={form.police_number}
+                onChange={handleChange}
+                className="input"
+                placeholder="e.g., B 1234 ABC"
+              />
+              {errors.police_number && (
+                <div className="text-red-600 text-sm mt-1">{errors.police_number}</div>
+              )}
+            </div>
+
+            {/* BYD Car Model */}
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 BYD Car Model *
               </label>
@@ -209,52 +224,7 @@ export default function TestDriveForm() {
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                License Plate *
-              </label>
-              <input
-                name="plate_number"
-                value={form.plate_number}
-                onChange={handleChange}
-                className="input"
-                placeholder="e.g., B 1234 ABC"
-              />
-              {errors.plate_number && (
-                <div className="text-red-600 text-sm mt-1">{errors.plate_number}</div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Odometer (km) *
-              </label>
-              <input
-                name="kilometer"
-                value={form.kilometer}
-                onChange={handleChange}
-                className="input"
-                placeholder="Enter kilometers"
-                type="number"
-              />
-              {errors.kilometer && (
-                <div className="text-red-600 text-sm mt-1">{errors.kilometer}</div>
-              )}
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fuel Condition
-              </label>
-              <input
-                name="fuel_condition"
-                value={form.fuel_condition}
-                onChange={handleChange}
-                className="input"
-                placeholder="e.g., Full, 3/4, Half, Low"
-              />
-            </div>
-
+            {/* Vehicle Condition Notes */}
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Vehicle Condition Notes
@@ -267,34 +237,240 @@ export default function TestDriveForm() {
                 rows="3"
                 placeholder="Any scratches, damages, or notes about the vehicle condition..."
               />
-            </div>            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            </div>
+
+            {/* Photo Sections */}
+            <div className="sm:col-span-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 border-t pt-4">
                 Vehicle Photos *
-              </label>
-              {photoUrls.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  {photoUrls.map((url, i) => (
-                    <div key={i} className="relative">
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Take photos from all required angles. Each photo is mandatory.
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {/* Front Photo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Front Side Photo *
+                  </label>
+                  {form.front_photo ? (
+                    <div className="relative">
                       <img 
-                        src={url} 
-                        alt={`Vehicle photo ${i + 1}`} 
-                        className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" 
+                        src={form.front_photo} 
+                        alt="Front view" 
+                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200" 
                       />
+                      <button
+                        type="button"
+                        onClick={() => openCamera('front_photo')}
+                        className="absolute inset-0 bg-black bg-opacity-50 text-white text-xs rounded-lg opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        Retake
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openCamera('front_photo')}
+                      className={`w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                        errors.front_photo ? 'border-red-300 text-red-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      📷
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                  {errors.front_photo && (
+                    <div className="text-red-600 text-xs mt-1">{errors.front_photo}</div>
+                  )}
                 </div>
-              )}              <button
-                type="button"
-                onClick={() => setShowCamera(true)}
-                className={`btn w-full sm:w-auto ${
-                  photoUrls.length > 0 ? 'btn-secondary' : 'btn-primary'
-                }`}
-              >
-                {photoUrls.length > 0 ? '📷 Retake Photos' : '📷 Take Photos *'}
-              </button>
-              {errors.photos && (
-                <div className="text-red-600 text-sm mt-1">{errors.photos}</div>
-              )}
+
+                {/* Back Photo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Back Side Photo *
+                  </label>
+                  {form.back_photo ? (
+                    <div className="relative">
+                      <img 
+                        src={form.back_photo} 
+                        alt="Back view" 
+                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openCamera('back_photo')}
+                        className="absolute inset-0 bg-black bg-opacity-50 text-white text-xs rounded-lg opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        Retake
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openCamera('back_photo')}
+                      className={`w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                        errors.back_photo ? 'border-red-300 text-red-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      📷
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                  {errors.back_photo && (
+                    <div className="text-red-600 text-xs mt-1">{errors.back_photo}</div>
+                  )}
+                </div>
+
+                {/* Left Photo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Left Side Photo *
+                  </label>
+                  {form.left_photo ? (
+                    <div className="relative">
+                      <img 
+                        src={form.left_photo} 
+                        alt="Left view" 
+                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openCamera('left_photo')}
+                        className="absolute inset-0 bg-black bg-opacity-50 text-white text-xs rounded-lg opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        Retake
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openCamera('left_photo')}
+                      className={`w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                        errors.left_photo ? 'border-red-300 text-red-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      📷
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                  {errors.left_photo && (
+                    <div className="text-red-600 text-xs mt-1">{errors.left_photo}</div>
+                  )}
+                </div>
+
+                {/* Right Photo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Right Side Photo *
+                  </label>
+                  {form.right_photo ? (
+                    <div className="relative">
+                      <img 
+                        src={form.right_photo} 
+                        alt="Right view" 
+                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openCamera('right_photo')}
+                        className="absolute inset-0 bg-black bg-opacity-50 text-white text-xs rounded-lg opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        Retake
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openCamera('right_photo')}
+                      className={`w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                        errors.right_photo ? 'border-red-300 text-red-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      📷
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                  {errors.right_photo && (
+                    <div className="text-red-600 text-xs mt-1">{errors.right_photo}</div>
+                  )}
+                </div>
+
+                {/* Mid Photo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    MID Photo *
+                  </label>
+                  {form.mid_photo ? (
+                    <div className="relative">
+                      <img 
+                        src={form.mid_photo} 
+                        alt="Mid view" 
+                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openCamera('mid_photo')}
+                        className="absolute inset-0 bg-black bg-opacity-50 text-white text-xs rounded-lg opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        Retake
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openCamera('mid_photo')}
+                      className={`w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                        errors.mid_photo ? 'border-red-300 text-red-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      📷
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                  {errors.mid_photo && (
+                    <div className="text-red-600 text-xs mt-1">{errors.mid_photo}</div>
+                  )}
+                </div>
+
+                {/* Form Photo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Form Test Drive Photo *
+                  </label>
+                  {form.form_photo ? (
+                    <div className="relative">
+                      <img 
+                        src={form.form_photo} 
+                        alt="Form test drive" 
+                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openCamera('form_photo')}
+                        className="absolute inset-0 bg-black bg-opacity-50 text-white text-xs rounded-lg opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        Retake
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openCamera('form_photo')}
+                      className={`w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                        errors.form_photo ? 'border-red-300 text-red-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'
+                      }`}
+                    >
+                      📷
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                  {errors.form_photo && (
+                    <div className="text-red-600 text-xs mt-1">{errors.form_photo}</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -322,10 +498,15 @@ export default function TestDriveForm() {
         <div className="modal-overlay">
           <div className="modal-content p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Take Vehicle Photos</h3>
+              <h3 className="text-lg font-semibold">
+                Take {currentPhotoType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </h3>
               <button
                 type="button"
-                onClick={() => setShowCamera(false)}
+                onClick={() => {
+                  setShowCamera(false);
+                  setCurrentPhotoType('');
+                }}
                 className="btn btn-secondary p-2"
               >
                 Close

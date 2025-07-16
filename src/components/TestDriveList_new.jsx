@@ -6,14 +6,13 @@ import DeleteModal from './DeleteModal';
 function exportToCSV(data) {
   const replacer = (key, value) => value === null ? '' : value;
   const header = [
-    'Customer Name', 'Employee Name', 'Date & Time', 'Status', 'Police Number', 'Car Model', 'Notes', 
+    'Customer Name', 'Employee Name', 'Date & Time', 'Police Number', 'Car Model', 'Notes', 
     'Front Photo', 'Back Photo', 'Left Photo', 'Right Photo', 'Mid Photo', 'Form Photo'
   ];
   const rows = data.map(td => [
     td.customer_name,
     td.employee_name,
     new Date(td.date_time).toLocaleString(),
-    td.status,
     td.police_number,
     td.car_model,
     td.notes,
@@ -39,7 +38,6 @@ export default function TestDriveList() {
   const [search, setSearch] = useState('');
   const [date, setDate] = useState('');
   const [employee, setEmployee] = useState('');
-  const [status, setStatus] = useState('');
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null });
   const [bulkDeleteModal, setBulkDeleteModal] = useState(false);
@@ -49,8 +47,7 @@ export default function TestDriveList() {
     return (
       (!search || td.police_number?.toLowerCase().includes(search.toLowerCase())) &&
       (!date || td.date_time?.startsWith(date)) &&
-      (!employee || td.employee_name?.toLowerCase().includes(employee.toLowerCase())) &&
-      (!status || td.status === status)
+      (!employee || td.employee_name?.toLowerCase().includes(employee.toLowerCase()))
     );
   });
 
@@ -139,7 +136,7 @@ export default function TestDriveList() {
       {/* Filters */}
       <div className="card">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-1">
             <label className="block text-sm font-medium text-gray-700 sm:hidden">Police Number</label>
             <div className="relative">
@@ -178,22 +175,9 @@ export default function TestDriveList() {
               />
             </div>
           </div>
-
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700 sm:hidden">Status</label>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-              className="input"
-            >
-              <option value="">All Status</option>
-              <option value="OUT">OUT</option>
-              <option value="IN">IN</option>
-            </select>
-          </div>
         </div>
         
-        {(search || date || employee || status) && (
+        {(search || date || employee) && (
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm text-gray-600">
               Showing {filtered.length} of {testDrives.length} records
@@ -203,7 +187,6 @@ export default function TestDriveList() {
                 setSearch('');
                 setDate('');
                 setEmployee('');
-                setStatus('');
               }}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
@@ -249,7 +232,6 @@ export default function TestDriveList() {
                 </th>
                 <th>Employee</th>
                 <th>Date & Time</th>
-                <th>Status</th>
                 <th>Police Number</th>
                 <th>Car Model</th>
                 <th>Photos</th>
@@ -259,7 +241,7 @@ export default function TestDriveList() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-8 text-gray-500">
+                  <td colSpan="7" className="text-center py-8 text-gray-500">
                     {testDrives.length === 0 ? 'No test drive records found' : 'No records match your filters'}
                   </td>
                 </tr>
@@ -285,17 +267,6 @@ export default function TestDriveList() {
                       <div className="text-xs text-gray-500">
                         {new Date(td.date_time).toLocaleTimeString()}
                       </div>
-                    </td>
-                    <td>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        td.status === 'OUT' 
-                          ? 'bg-red-100 text-red-800' 
-                          : td.status === 'IN'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {td.status || 'N/A'}
-                      </span>
                     </td>
                     <td className="font-mono text-sm">{td.police_number}</td>
                     <td className="text-gray-600">{td.car_model}</td>

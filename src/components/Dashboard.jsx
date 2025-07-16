@@ -5,19 +5,31 @@ import { TrendingUp, TrendingDown, Clock, BarChart3 } from 'lucide-react';
 export default function Dashboard() {
   const { testDrives, loading, error } = useTestDrive();
 
-  // Simple statistics
+  // Statistics for status-based records
+  const total = testDrives.length;
   const totalOut = testDrives.filter(td => td.status === 'OUT').length;
   const totalIn = testDrives.filter(td => td.status === 'IN').length;
-  const pending = totalOut - totalIn;
-  const total = testDrives.length;
+  
+  // Calculate pending: vehicles that are OUT but haven't come back IN
+  // Group by police_number and check latest status
+  const vehicleStatus = {};
+  testDrives
+    .sort((a, b) => new Date(b.date_time) - new Date(a.date_time)) // Sort by newest first
+    .forEach(td => {
+      if (td.police_number && !vehicleStatus[td.police_number]) {
+        vehicleStatus[td.police_number] = td.status;
+      }
+    });
+  
+  const pending = Object.values(vehicleStatus).filter(status => status === 'OUT').length;
 
   const stats = [
     {
       title: 'Total OUT',
       value: totalOut,
       icon: TrendingUp,
-      color: 'bg-blue-500',
-      bgColor: 'bg-blue-50',
+      color: 'bg-red-500',
+      bgColor: 'bg-red-50',
     },
     {
       title: 'Total IN',
@@ -37,8 +49,8 @@ export default function Dashboard() {
       title: 'Total Records',
       value: total,
       icon: BarChart3,
-      color: 'bg-purple-500',
-      bgColor: 'bg-purple-50',
+      color: 'bg-blue-500',
+      bgColor: 'bg-blue-50',
     },
   ];
   return (
@@ -93,24 +105,26 @@ export default function Dashboard() {
           <table className="table">
             <thead>
               <tr>
-                <th className="w-1/4">Employee</th>
-                <th className="w-1/4">Date & Time</th>
+                <th className="w-1/5">Customer</th>
+                <th className="w-1/5">Employee</th>
+                <th className="w-1/5">Date & Time</th>
                 <th className="w-1/6">Status</th>
-                <th className="w-1/4">Car Model</th>
-                <th className="w-1/6">Plate</th>
+                <th className="w-1/5">Car Model</th>
+                <th className="w-1/6">Police #</th>
               </tr>
             </thead>
             <tbody>
               {testDrives.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-8 text-gray-500">
+                  <td colSpan="6" className="text-center py-8 text-gray-500">
                     No test drive records found
                   </td>
                 </tr>
               ) : (
                 testDrives.slice(0, 5).map((td) => (
                   <tr key={td.id}>
-                    <td className="font-medium">{td.employee_name}</td>
+                    <td className="font-medium">{td.customer_name}</td>
+                    <td className="text-gray-600">{td.employee_name}</td>
                     <td className="text-gray-600">
                       <div className="text-xs sm:text-sm">
                         {new Date(td.date_time).toLocaleDateString()}
@@ -120,18 +134,18 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td>
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          td.status === 'OUT'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {td.status}
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        td.status === 'OUT' 
+                          ? 'bg-red-100 text-red-800' 
+                          : td.status === 'IN'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {td.status || 'N/A'}
                       </span>
                     </td>
                     <td className="text-gray-600">{td.car_model}</td>
-                    <td className="font-mono text-sm">{td.plate_number}</td>
+                    <td className="font-mono text-xs">{td.police_number}</td>
                   </tr>
                 ))
               )}
