@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import { uploadToCloudinary } from '../utils/cloudinary';
 
-export default function CameraCapture({ onPhotosCaptured }) {
+export default function CameraCapture({ onPhotosCaptured, onCapture, onCancel, title }) {
   const webcamRef = useRef(null);
   const [photos, setPhotos] = useState([]);
   const [zoom, setZoom] = useState(1);
@@ -81,7 +81,15 @@ export default function CameraCapture({ onPhotosCaptured }) {
         const result = await uploadToCloudinary(blob);
         uploaded.push(result.secure_url);
       }
-      onPhotosCaptured(uploaded);
+      
+      // Support both callback patterns
+      if (onPhotosCaptured) {
+        onPhotosCaptured(uploaded);
+      } else if (onCapture && uploaded.length > 0) {
+        // For single photo capture, return the first photo
+        onCapture(uploaded[0]);
+      }
+      
       setPhotos([]);
     } catch (err) {
       setError('Upload gagal: ' + err.message);
@@ -91,6 +99,13 @@ export default function CameraCapture({ onPhotosCaptured }) {
   }
   return (
     <div className="flex flex-col items-center space-y-4">
+      {/* Title */}
+      {title && (
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-gray-900 capitalize">{title}</h2>
+        </div>
+      )}
+      
       {/* Instructions */}
       <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
         <p>📷 Ambil foto kendaraan dari berbagai sudut</p>
@@ -189,20 +204,31 @@ export default function CameraCapture({ onPhotosCaptured }) {
 
       {/* Upload Button */}
       <div className="w-full flex flex-col items-center gap-2">
-        <button
-          onClick={handleUpload}
-          className="btn btn-success w-full sm:w-auto"
-          disabled={uploading || photos.length === 0}
-        >
-          {uploading ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Uploading...
-            </div>
-          ) : (
-            `🔄 Upload & Complete (${photos.length} photos)`
+        <div className="flex gap-3 w-full sm:w-auto">
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="btn bg-gray-500 hover:bg-gray-600 text-white flex-1 sm:flex-none"
+              disabled={uploading}
+            >
+              Cancel
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleUpload}
+            className="btn btn-success flex-1 sm:flex-none"
+            disabled={uploading || photos.length === 0}
+          >
+            {uploading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Uploading...
+              </div>
+            ) : (
+              `🔄 Upload & Complete (${photos.length} photos)`
+            )}
+          </button>
+        </div>
         
         {error && (
           <div className="text-red-600 text-sm text-center bg-red-50 p-3 rounded-lg border border-red-200 w-full">

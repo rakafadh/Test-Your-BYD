@@ -1,14 +1,61 @@
-# BYD Test Drive Tracker
+# 🚗⚡ BYD Bekasi Timur - Multi Tracker App
 
-A modern, responsive web application for managing BYD vehicle test drives at Harmony Auto Bekasi Timur. Built with React, Vite, Tailwind CSS, and Supabase.
+Modern webapp untuk tracking aktivitas **Test Drive** dan **Charging AC/DC** di BYD Bekasi Timur.
 
-## Features
+## 🎯 **Features**
 
-### 🚗 Test Drive Management
-- **Add Test Drives**: Record employee name, date/time, vehicle details, and condition
-- **Status Tracking**: Track vehicles going OUT and coming IN
-- **Validation**: Prevent duplicate OUT entries for the same license plate
-- **Offline Support**: Continue working without internet connection
+### **Test Drive Tracker**
+- ✅ Dashboard statistik lengkap (OUT, IN, Pending, Total)
+- ✅ Form dengan validasi real-time dan 6 foto capture
+- ✅ List dengan filter advanced dan export Excel
+- ✅ Auto-delete berdasarkan umur data
+- ✅ Status tracking OUT/IN dengan timestamp
+
+### **Charging AC/DC Tracker** 
+- ✅ Dashboard statistik charging (Total, Today, This Week, AC vs DC)
+- ✅ Form dengan station type AC/DC dan 2 foto capture
+- ✅ List dengan filter dan export Excel
+- ✅ Auto-delete dan data management
+- ✅ Notes dan phone number tracking
+
+## 🏗️ **Tech Stack**
+- **Frontend**: React 18 + Vite
+- **Backend**: Supabase (PostgreSQL)
+- **Storage**: Cloudinary (photos)
+- **Styling**: Modern CSS + Tailwind utilities
+- **State**: Context API
+- **Mobile**: PWA ready
+
+## 🚀 **Quick Start**
+
+```bash
+# Clone repository
+git clone [your-repo-url]
+cd test-your-BYD
+
+# Install dependencies
+npm install
+
+# Setup environment variables (lihat .env.example)
+cp .env.example .env
+
+# Setup database (lihat TRACKER_SETUP_GUIDE.md)
+# Jalankan SQL scripts di Supabase
+
+# Run development server
+npm run dev
+```
+
+## 📚 **Documentation**
+- 📖 **[Setup Guide](./TRACKER_SETUP_GUIDE.md)** - Complete setup instructions
+- 🗄️ **[Database Schema](./setup_charging_database.sql)** - SQL for Charging tracker
+- 🗄️ **[Database Schema](./setup_supabase_database.sql)** - SQL for Test Drive tracker
+
+## 🎨 **Design System**
+- **Colors**: Calm blue palette dengan gradients
+- **Layout**: Card-based, mobile-first responsive
+- **Navigation**: Breadcrumb + contextual menus
+- **Components**: Reusable, accessible UI components
 
 ### 📱 Mobile-First Design
 - **Responsive Layout**: Works perfectly on phones, tablets, and desktops

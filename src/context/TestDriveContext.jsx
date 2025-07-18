@@ -14,6 +14,11 @@ export function TestDriveProvider({ children }) {
   const [error, setError] = useState(null);
   const [offlineQueue, setOfflineQueue] = useState([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [settings, setSettings] = useState({
+    autoDeleteEnabled: false,
+    autoDeleteDays: 30,
+    notifications: true
+  });
   const { toasts, addToast, removeToast, showSuccess, showError, showWarning, showInfo } = useToast();
 
   // Network status tracking
@@ -212,15 +217,41 @@ export function TestDriveProvider({ children }) {
     }
   }, [isOnline, testDrives.length]);
 
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('testDriveSettings');
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  }, []);
+
+  const updateSettings = (newSettings) => {
+    setSettings(prev => ({
+      ...prev,
+      ...newSettings
+    }));
+    // Save to localStorage for persistence
+    localStorage.setItem('testDriveSettings', JSON.stringify({
+      ...settings,
+      ...newSettings
+    }));
+  };
+
   const value = {
     testDrives,
     loading,
     error,
     offlineQueue,
     isOnline,
+    settings,
     fetchTestDrives,
     addTestDrive,
     setOfflineQueue,
+    updateSettings,
     showSuccess,
     showError,
     showWarning,

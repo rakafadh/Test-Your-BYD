@@ -1,53 +1,52 @@
 import React, { useState } from 'react';
-import { useTestDrive } from '../context/TestDriveContext';
-import { Download, Search, Calendar, User, Trash2 } from 'lucide-react';
-import DeleteModal from './DeleteModal';
+import { useCharging } from '../../context/ChargingContext';
+import { Download, Search, Calendar, User, Trash2, Phone } from 'lucide-react';
+import DeleteModal from '../DeleteModal';
 
-function exportToCSV(data) {
-  const replacer = (key, value) => value === null ? '' : value;
+function exportToExcel(data) {
   const header = [
-    'Customer Name', 'Employee Name', 'Date & Time', 'Police Number', 'Car Model', 'Notes', 
-    'Front Photo', 'Back Photo', 'Left Photo', 'Right Photo', 'Mid Photo', 'Form Photo'
+    'Customer Name', 'Employee Name', 'Date & Time', 'Police Number', 'Phone Number', 
+    'Car Model', 'Charging Station Type', 'Notes', 'Front Side Photo', 'Nomor Rangka Photo'
   ];
-  const rows = data.map(td => [
-    td.customer_name,
-    td.employee_name,
-    new Date(td.date_time).toLocaleString(),
-    td.police_number,
-    td.car_model,
-    td.notes,
-    td.front_photo || '',
-    td.back_photo || '',
-    td.left_photo || '',
-    td.right_photo || '',
-    td.mid_photo || '',
-    td.form_photo || ''
+  const rows = data.map(cr => [
+    cr.customer_name,
+    cr.employee_name,
+    new Date(cr.date_time).toLocaleString(),
+    cr.police_number,
+    cr.phone_number || '',
+    cr.car_model,
+    cr.charging_station_type,
+    cr.notes || '',
+    cr.front_side_photo || '',
+    cr.nomor_rangka_photo || ''
   ]);
   let csv = [header, ...rows].map(e => e.map(a => `"${a}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `testdrive_${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `charging_records_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export default function TestDriveList() {
-  const { testDrives, loading, error, deleteTestDrive, deleteMultipleTestDrives, showSuccess, showError, isOnline } = useTestDrive();
+export default function ChargingList() {
+  const { chargingRecords, loading, error, deleteChargingRecord, deleteMultipleChargingRecords, showSuccess, showError, isOnline } = useCharging();
   const [search, setSearch] = useState('');
   const [date, setDate] = useState('');
   const [employee, setEmployee] = useState('');
+  const [stationType, setStationType] = useState('');
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null });
   const [bulkDeleteModal, setBulkDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const filtered = testDrives.filter(td => {
+  const filtered = chargingRecords.filter(cr => {
     return (
-      (!search || td.police_number?.toLowerCase().includes(search.toLowerCase())) &&
-      (!date || td.date_time?.startsWith(date)) &&
-      (!employee || td.employee_name?.toLowerCase().includes(employee.toLowerCase()))
+      (!search || cr.police_number?.toLowerCase().includes(search.toLowerCase())) &&
+      (!date || cr.date_time?.startsWith(date)) &&
+      (!employee || cr.employee_name?.toLowerCase().includes(employee.toLowerCase())) &&
+      (!stationType || cr.charging_station_type === stationType)
     );
   });
 
@@ -66,7 +65,7 @@ export default function TestDriveList() {
     if (selectedItems.size === filtered.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(filtered.map(td => td.id)));
+      setSelectedItems(new Set(filtered.map(cr => cr.id)));
     }
   };
 
@@ -74,7 +73,7 @@ export default function TestDriveList() {
   const handleDeleteSingle = async () => {
     setDeleting(true);
     try {
-      await deleteTestDrive(deleteModal.item.id);
+      await deleteChargingRecord(deleteModal.item.id);
       showSuccess('Record deleted successfully');
       setDeleteModal({ isOpen: false, item: null });
       setSelectedItems(new Set());
@@ -88,8 +87,9 @@ export default function TestDriveList() {
   const handleBulkDelete = async () => {
     setDeleting(true);
     try {
-      const result = await deleteMultipleTestDrives(Array.from(selectedItems));
-      showSuccess(`Successfully deleted ${result.count} records`);
+      const idsArray = Array.from(selectedItems);
+      await deleteMultipleChargingRecords(idsArray);
+      showSuccess(`${idsArray.length} records deleted successfully`);
       setBulkDeleteModal(false);
       setSelectedItems(new Set());
     } catch (err) {
@@ -101,43 +101,46 @@ export default function TestDriveList() {
 
   return (
     <div className="space-y-6 mt-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Test Drive Records</h2>
-          {selectedItems.size > 0 && (
-            <div className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-              {selectedItems.size} selected
-            </div>
-          )}
+      {/* Header - Mobile First */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Charging Records</h2>
+            {selectedItems.size > 0 && (
+              <div className="text-xs sm:text-sm text-gray-600 bg-green-50 px-2 sm:px-3 py-1 rounded-full border border-green-200">
+                {selectedItems.size} selected
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
+        
+        <div className="flex flex-col sm:flex-row gap-3">
           {selectedItems.size > 0 && (
             <button
               onClick={() => setBulkDeleteModal(true)}
-              className="btn bg-red-600 hover:bg-red-700 text-white text-sm"
+              className="btn bg-red-600 hover:bg-red-700 text-white text-sm tap-target"
               disabled={!isOnline}
             >
               <Trash2 className="w-4 h-4 mr-1" />
-              Delete Selected
+              <span>Delete Selected</span>
             </button>
           )}
           <button
-            onClick={() => exportToCSV(filtered)}
-            className="btn btn-success flex items-center gap-2"
+            onClick={() => exportToExcel(filtered)}
+            className="btn btn-success flex items-center justify-center gap-2 tap-target"
             disabled={filtered.length === 0}
           >
             <Download className="w-4 h-4" />
-            Export CSV ({filtered.length})
+            <span>Export Excel ({filtered.length})</span>
           </button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters - Mobile Optimized */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="space-y-1">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Filters</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1 sm:col-span-2 lg:col-span-1">
             <label className="block text-sm font-medium text-gray-700 sm:hidden">Police Number</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
@@ -175,20 +178,34 @@ export default function TestDriveList() {
               />
             </div>
           </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700 sm:hidden">Station Type</label>
+            <select
+              value={stationType}
+              onChange={e => setStationType(e.target.value)}
+              className="input"
+            >
+              <option value="">All Station Types</option>
+              <option value="DC Charging">DC Charging</option>
+              <option value="AC Charging">AC Charging</option>
+            </select>
+          </div>
         </div>
         
-        {(search || date || employee) && (
+        {(search || date || employee || stationType) && (
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm text-gray-600">
-              Showing {filtered.length} of {testDrives.length} records
+              Showing {filtered.length} of {chargingRecords.length} records
             </span>
             <button
               onClick={() => {
                 setSearch('');
                 setDate('');
                 setEmployee('');
+                setStationType('');
               }}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="text-sm text-green-600 hover:text-green-800"
             >
               Clear filters
             </button>
@@ -196,11 +213,10 @@ export default function TestDriveList() {
         )}
       </div>
 
-      {/* Loading and Error States */}
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
             <span className="text-gray-600">Loading records...</span>
           </div>
         </div>
@@ -232,7 +248,9 @@ export default function TestDriveList() {
                 </th>
                 <th>Employee</th>
                 <th>Date & Time</th>
+                <th>Station Type</th>
                 <th>Police Number</th>
+                <th>Phone</th>
                 <th>Car Model</th>
                 <th>Photos</th>
                 <th className="text-right pr-4">Actions</th>
@@ -241,44 +259,57 @@ export default function TestDriveList() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-8 text-gray-500">
-                    {testDrives.length === 0 ? 'No test drive records found' : 'No records match your filters'}
+                  <td colSpan="9" className="text-center py-8 text-gray-500">
+                    {chargingRecords.length === 0 ? 'No charging records found' : 'No records match your filters'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((td) => (
-                  <tr key={td.id} className="group">
+                filtered.map((cr) => (
+                  <tr key={cr.id} className="group">
                     <td className="sticky left-0 bg-white group-hover:bg-gray-50 font-medium z-10">
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={selectedItems.has(td.id)}
-                          onChange={() => handleSelectItem(td.id)}
+                          checked={selectedItems.has(cr.id)}
+                          onChange={() => handleSelectItem(cr.id)}
                           className="checkbox checkbox-sm"
                         />
-                        {td.customer_name}
+                        {cr.customer_name}
                       </div>
                     </td>
-                    <td className="text-gray-600">{td.employee_name}</td>
+                    <td className="text-gray-600">{cr.employee_name}</td>
                     <td className="text-gray-600">
                       <div className="text-sm">
-                        {new Date(td.date_time).toLocaleDateString()}
+                        {new Date(cr.date_time).toLocaleDateString()}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(td.date_time).toLocaleTimeString()}
+                        {new Date(cr.date_time).toLocaleTimeString()}
                       </div>
                     </td>
-                    <td className="font-mono text-sm">{td.police_number}</td>
-                    <td className="text-gray-600">{td.car_model}</td>
+                    <td>
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        cr.charging_station_type === 'DC Charging' 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {cr.charging_station_type}
+                      </span>
+                    </td>
+                    <td className="font-mono text-sm">{cr.police_number}</td>
+                    <td className="text-gray-600 text-sm">
+                      {cr.phone_number && (
+                        <div className="flex items-center">
+                          <Phone className="w-3 h-3 mr-1 text-gray-400" />
+                          {cr.phone_number}
+                        </div>
+                      )}
+                    </td>
+                    <td className="text-gray-600">{cr.car_model}</td>
                     <td>
                       <div className="flex gap-1 flex-wrap">
                         {[
-                          { url: td.front_photo, label: 'F' },
-                          { url: td.back_photo, label: 'B' },
-                          { url: td.left_photo, label: 'L' },
-                          { url: td.right_photo, label: 'R' },
-                          { url: td.mid_photo, label: 'M' },
-                          { url: td.form_photo, label: 'Form' }
+                          { url: cr.front_side_photo, label: 'Front' },
+                          { url: cr.nomor_rangka_photo, label: 'Rangka' }
                         ].filter(photo => photo.url).map((photo, i) => (
                           <a
                             href={photo.url}
@@ -295,21 +326,20 @@ export default function TestDriveList() {
                             />
                           </a>
                         ))}
-                        {[td.front_photo, td.back_photo, td.left_photo, td.right_photo, td.mid_photo, td.form_photo].filter(Boolean).length === 0 && (
+                        {[cr.front_side_photo, cr.nomor_rangka_photo].filter(Boolean).length === 0 && (
                           <span className="text-gray-400 text-sm">No photos</span>
                         )}
                       </div>
                     </td>
                     <td className="text-right pr-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setDeleteModal({ isOpen: true, item: td })}
-                          className="text-red-600 hover:text-red-800"
-                          disabled={!isOnline}
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, item: cr })}
+                        className="btn btn-sm bg-red-600 hover:bg-red-700 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        disabled={!isOnline}
+                        title="Delete record"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -324,19 +354,18 @@ export default function TestDriveList() {
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, item: null })}
         onConfirm={handleDeleteSingle}
-        title="Delete Test Drive Record"
-        message="This action cannot be undone."
-        item={deleteModal.item}
-        isLoading={deleting}
+        loading={deleting}
+        title="Delete Charging Record"
+        message={`Are you sure you want to delete the charging record for ${deleteModal.item?.customer_name}?`}
       />
-      
+
       <DeleteModal
         isOpen={bulkDeleteModal}
         onClose={() => setBulkDeleteModal(false)}
         onConfirm={handleBulkDelete}
-        title={`Delete ${selectedItems.size} Records`}
-        message={`Are you sure you want to delete ${selectedItems.size} selected records? This action cannot be undone.`}
-        isLoading={deleting}
+        loading={deleting}
+        title="Delete Multiple Records"
+        message={`Are you sure you want to delete ${selectedItems.size} charging records?`}
       />
     </div>
   );

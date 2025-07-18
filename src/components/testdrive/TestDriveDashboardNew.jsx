@@ -1,40 +1,28 @@
-import React, { useState } from 'react';
-import { useTestDrive } from '../context/TestDriveContext';
-import { TrendingUp, TrendingDown, Clock, BarChart3 } from 'lucide-react';
+import React from 'react';
+import { useTestDrive } from '../../context/TestDriveContext';
+import { Car, TrendingUp, Clock, BarChart3, AlertCircle } from 'lucide-react';
 
-export default function Dashboard() {
-  const { testDrives, loading, error } = useTestDrive();
+export default function TestDriveDashboard() {
+  const { testDrives, isLoading, isOffline } = useTestDrive();
 
-  // Statistics for status-based records
+  // Statistics for test drive records
   const total = testDrives.length;
   const totalOut = testDrives.filter(td => td.status === 'OUT').length;
   const totalIn = testDrives.filter(td => td.status === 'IN').length;
-  
-  // Calculate pending: vehicles that are OUT but haven't come back IN
-  // Group by police_number and check latest status
-  const vehicleStatus = {};
-  testDrives
-    .sort((a, b) => new Date(b.date_time) - new Date(a.date_time)) // Sort by newest first
-    .forEach(td => {
-      if (td.police_number && !vehicleStatus[td.police_number]) {
-        vehicleStatus[td.police_number] = td.status;
-      }
-    });
-  
-  const pending = Object.values(vehicleStatus).filter(status => status === 'OUT').length;
+  const pending = totalOut; // Cars that are still OUT
 
   const stats = [
     {
       title: 'Total OUT',
       value: totalOut,
-      icon: TrendingUp,
+      icon: Car,
       color: 'bg-red-500',
       bgColor: 'bg-red-50',
     },
     {
       title: 'Total IN',
       value: totalIn,
-      icon: TrendingDown,
+      icon: TrendingUp,
       color: 'bg-green-500',
       bgColor: 'bg-green-50',
     },
@@ -42,8 +30,8 @@ export default function Dashboard() {
       title: 'Pending',
       value: pending,
       icon: Clock,
-      color: 'bg-yellow-500',
-      bgColor: 'bg-yellow-50',
+      color: 'bg-orange-500',
+      bgColor: 'bg-orange-50',
     },
     {
       title: 'Total Records',
@@ -53,38 +41,45 @@ export default function Dashboard() {
       bgColor: 'bg-blue-50',
     },
   ];
+
   return (
-    <div className="space-y-6 mt-4">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-        {loading && (
+        {isLoading && (
           <div className="flex items-center gap-2 text-blue-600">
             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
             <span className="text-sm">Loading data...</span>
           </div>
         )}
+        {isOffline && (
+          <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+            <AlertCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">Offline Mode</span>
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="text-red-800 font-medium">Error loading data</div>
-          <div className="text-red-600 text-sm mt-1">{error}</div>
-        </div>
-      )}
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Statistics Cards - Mobile Optimized */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className={`card ${stat.bgColor} border-l-4 ${stat.color.replace('bg-', 'border-')}`}>
+            <div key={index} className={`bg-white rounded-lg border border-gray-200 p-3 sm:p-4 hover:shadow-md transition-shadow ${stat.bgColor} border-l-4`} 
+                 style={{ borderLeftColor: stat.color.includes('red') ? '#ef4444' : 
+                                           stat.color.includes('green') ? '#10b981' :
+                                           stat.color.includes('orange') ? '#f59e0b' : '#3b82f6' }}>
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 font-medium">{stat.title}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
+                    {stat.value}
+                  </div>
+                  <div className="text-xs sm:text-sm text-gray-600 font-medium mt-1 leading-tight">
+                    {stat.title}
+                  </div>
                 </div>
-                <div className={`p-2 sm:p-3 rounded-full ${stat.color}`}>
-                  <Icon className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+                <div className={`p-2 sm:p-3 rounded-lg ${stat.color} flex-shrink-0 ml-2`}>
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
               </div>
             </div>
@@ -95,7 +90,7 @@ export default function Dashboard() {
       {/* Recent Activity */}
       <div className="card">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Recent Activity</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Recent Test Drive Activity</h2>
           <div className="text-xs sm:text-sm text-gray-500">
             Showing latest 5 records
           </div>
@@ -127,21 +122,19 @@ export default function Dashboard() {
                     <td className="text-gray-600">{td.employee_name}</td>
                     <td className="text-gray-600">
                       <div className="text-xs sm:text-sm">
-                        {new Date(td.date_time).toLocaleDateString()}
+                        {new Date(td.created_at).toLocaleDateString()}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(td.date_time).toLocaleTimeString()}
+                        {new Date(td.created_at).toLocaleTimeString()}
                       </div>
                     </td>
                     <td>
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         td.status === 'OUT' 
                           ? 'bg-red-100 text-red-800' 
-                          : td.status === 'IN'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
+                          : 'bg-green-100 text-green-800'
                       }`}>
-                        {td.status || 'N/A'}
+                        {td.status}
                       </span>
                     </td>
                     <td className="text-gray-600">{td.car_model}</td>

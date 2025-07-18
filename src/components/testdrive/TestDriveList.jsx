@@ -1,40 +1,42 @@
 import React, { useState } from 'react';
-import { useTestDrive } from '../context/TestDriveContext';
+import { useTestDrive } from '../../context/TestDriveContext';
 import { Download, Search, Calendar, User, Trash2 } from 'lucide-react';
-import DeleteModal from './DeleteModal';
+import DeleteModal from '../DeleteModal';
 
-function exportToCSV(data) {
-  const replacer = (key, value) => value === null ? '' : value;
+function exportToExcel(data) {
   const header = [
-    'Customer Name', 'Employee Name', 'Date & Time', 'Status', 'Police Number', 'Car Model', 'Notes', 
-    'Front Photo', 'Back Photo', 'Left Photo', 'Right Photo', 'Mid Photo', 'Form Photo'
+    'ID', 'Customer Name', 'Employee Name', 'Date & Time', 'Police Number', 'Car Model', 
+    'Status', 'Notes', 'Front Photo', 'Back Photo', 'Left Photo', 'Right Photo', 
+    'Mid Photo', 'Form Photo', 'Created At'
   ];
   const rows = data.map(td => [
-    td.customer_name,
-    td.employee_name,
-    new Date(td.date_time).toLocaleString(),
-    td.status,
-    td.police_number,
-    td.car_model,
-    td.notes,
+    td.id || '',
+    td.customer_name || '',
+    td.employee_name || '',
+    td.date_time ? new Date(td.date_time).toLocaleString() : '',
+    td.police_number || '',
+    td.car_model || '',
+    td.status || '',
+    td.notes || '',
     td.front_photo || '',
     td.back_photo || '',
     td.left_photo || '',
     td.right_photo || '',
     td.mid_photo || '',
-    td.form_photo || ''
+    td.form_photo || '',
+    td.created_at ? new Date(td.created_at).toLocaleString() : ''
   ]);
   let csv = [header, ...rows].map(e => e.map(a => `"${a}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `testdrive_${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `test_drive_records_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export default function TestDriveList() {
+function TestDriveList() {
   const { testDrives, loading, error, deleteTestDrive, deleteMultipleTestDrives, showSuccess, showError, isOnline } = useTestDrive();
   const [search, setSearch] = useState('');
   const [date, setDate] = useState('');
@@ -91,8 +93,9 @@ export default function TestDriveList() {
   const handleBulkDelete = async () => {
     setDeleting(true);
     try {
-      const result = await deleteMultipleTestDrives(Array.from(selectedItems));
-      showSuccess(`Successfully deleted ${result.count} records`);
+      const idsArray = Array.from(selectedItems);
+      await deleteMultipleTestDrives(idsArray);
+      showSuccess(`${idsArray.length} records deleted successfully`);
       setBulkDeleteModal(false);
       setSelectedItems(new Set());
     } catch (err) {
@@ -104,43 +107,46 @@ export default function TestDriveList() {
 
   return (
     <div className="space-y-6 mt-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Test Drive Records</h2>
-          {selectedItems.size > 0 && (
-            <div className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-              {selectedItems.size} selected
-            </div>
-          )}
+      {/* Header - Mobile First */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Test Drive Records</h2>
+            {selectedItems.size > 0 && (
+              <div className="text-xs sm:text-sm text-gray-600 bg-green-50 px-2 sm:px-3 py-1 rounded-full border border-green-200">
+                {selectedItems.size} selected
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
+        
+        <div className="flex flex-col sm:flex-row gap-3">
           {selectedItems.size > 0 && (
             <button
               onClick={() => setBulkDeleteModal(true)}
-              className="btn bg-red-600 hover:bg-red-700 text-white text-sm"
+              className="btn bg-red-600 hover:bg-red-700 text-white text-sm tap-target"
               disabled={!isOnline}
             >
               <Trash2 className="w-4 h-4 mr-1" />
-              Delete Selected
+              <span>Delete Selected</span>
             </button>
           )}
           <button
-            onClick={() => exportToCSV(filtered)}
-            className="btn btn-success flex items-center gap-2"
+            onClick={() => exportToExcel(filtered)}
+            className="btn btn-success flex items-center justify-center gap-2 tap-target"
             disabled={filtered.length === 0}
           >
             <Download className="w-4 h-4" />
-            Export CSV ({filtered.length})
+            <span>Export Excel ({filtered.length})</span>
           </button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters - Mobile Optimized */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Filters</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-1">
+          <div className="space-y-1 sm:col-span-2 lg:col-span-1">
             <label className="block text-sm font-medium text-gray-700 sm:hidden">Police Number</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
@@ -189,6 +195,7 @@ export default function TestDriveList() {
               <option value="">All Status</option>
               <option value="OUT">OUT</option>
               <option value="IN">IN</option>
+              <option value="PENDING">PENDING</option>
             </select>
           </div>
         </div>
@@ -205,7 +212,7 @@ export default function TestDriveList() {
                 setEmployee('');
                 setStatus('');
               }}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="text-sm text-green-600 hover:text-green-800"
             >
               Clear filters
             </button>
@@ -213,11 +220,10 @@ export default function TestDriveList() {
         )}
       </div>
 
-      {/* Loading and Error States */}
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
             <span className="text-gray-600">Loading records...</span>
           </div>
         </div>
@@ -289,12 +295,12 @@ export default function TestDriveList() {
                     <td>
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         td.status === 'OUT' 
-                          ? 'bg-red-100 text-red-800' 
+                          ? 'bg-blue-100 text-blue-800' 
                           : td.status === 'IN'
                           ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
+                          : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {td.status || 'N/A'}
+                        {td.status}
                       </span>
                     </td>
                     <td className="font-mono text-sm">{td.police_number}</td>
@@ -302,11 +308,11 @@ export default function TestDriveList() {
                     <td>
                       <div className="flex gap-1 flex-wrap">
                         {[
-                          { url: td.front_photo, label: 'F' },
-                          { url: td.back_photo, label: 'B' },
-                          { url: td.left_photo, label: 'L' },
-                          { url: td.right_photo, label: 'R' },
-                          { url: td.mid_photo, label: 'M' },
+                          { url: td.front_photo, label: 'Front' },
+                          { url: td.back_photo, label: 'Back' },
+                          { url: td.left_photo, label: 'Left' },
+                          { url: td.right_photo, label: 'Right' },
+                          { url: td.mid_photo, label: 'Mid' },
                           { url: td.form_photo, label: 'Form' }
                         ].filter(photo => photo.url).map((photo, i) => (
                           <a
@@ -330,15 +336,14 @@ export default function TestDriveList() {
                       </div>
                     </td>
                     <td className="text-right pr-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setDeleteModal({ isOpen: true, item: td })}
-                          className="text-red-600 hover:text-red-800"
-                          disabled={!isOnline}
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, item: td })}
+                        className="btn btn-sm bg-red-600 hover:bg-red-700 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        disabled={!isOnline}
+                        title="Delete record"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -353,20 +358,21 @@ export default function TestDriveList() {
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, item: null })}
         onConfirm={handleDeleteSingle}
+        loading={deleting}
         title="Delete Test Drive Record"
-        message="This action cannot be undone."
-        item={deleteModal.item}
-        isLoading={deleting}
+        message={`Are you sure you want to delete the test drive record for ${deleteModal.item?.customer_name}?`}
       />
-      
+
       <DeleteModal
         isOpen={bulkDeleteModal}
         onClose={() => setBulkDeleteModal(false)}
         onConfirm={handleBulkDelete}
-        title={`Delete ${selectedItems.size} Records`}
-        message={`Are you sure you want to delete ${selectedItems.size} selected records? This action cannot be undone.`}
-        isLoading={deleting}
+        loading={deleting}
+        title="Delete Multiple Records"
+        message={`Are you sure you want to delete ${selectedItems.size} test drive records?`}
       />
     </div>
   );
 }
+
+export default TestDriveList;
